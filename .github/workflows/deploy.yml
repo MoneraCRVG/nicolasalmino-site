@@ -20,6 +20,10 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v5.0.0
 
+        # 2. Install wasm32-unknown-unknown target
+      - name: Install wasm target
+        run: rustup target add wasm32-unknown-unknown
+
       # 2. Install cargo-leptos
       # We run this as the root user (default in the container)
       # Caching this step could speed up future builds
