@@ -5,6 +5,8 @@ use leptos_router::{
     StaticSegment, WildcardSegment,
 };
 
+use crate::routes::home::HomePage;
+
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -14,10 +16,12 @@ pub fn App() -> impl IntoView {
     view! {
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet
+        <Stylesheet id="leptos" href="https://fonts.googleapis.com/css2?family=Saira:ital,wght@0,100..900;1,100..900&display=swap"/>
         <Stylesheet id="leptos" href="/pkg/nicolasalmino-site.css"/>
+        
 
         // sets the document title
-        <Title text="Welcome to Leptos"/>
+        <Title text="Nicolas Almino - Mídia & Web Dev"/>
 
         // content for this welcome page
         <Router>
@@ -28,19 +32,6 @@ pub fn App() -> impl IntoView {
                 </Routes>
             </main>
         </Router>
-    }
-}
-
-/// Renders the home page of your application.
-#[component]
-fn HomePage() -> impl IntoView {
-    // Creates a reactive value to update the button
-    let count = RwSignal::new(0);
-    let on_click = move |_| *count.write() += 1;
-
-    view! {
-        <h1>"Welcome to Leptos!"</h1>
-        <button on:click=on_click>"Click Me: " {count}</button>
     }
 }
 

@@ -1,0 +1,64 @@
+# This workflow builds and deploys a Leptos application.
+name: Deploy Leptos Site
+
+# Triggers the workflow on a push to the 'main' branch
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    # Use the official Rust Docker image as the container for this job
+    container:
+      image: rust:latest
+
+    steps:
+      # 1. Check out the repository code
+      - name: Check out code
+        uses: actions/checkout@v5.0.0
+
+      # 2. Install cargo-leptos
+      # We run this as the root user (default in the container)
+      # Caching this step could speed up future builds
+      - name: Install cargo-leptos
+        run: cargo install cargo-leptos
+
+      # 3. Build the Leptos project in release mode
+      - name: Build Leptos project
+        run: cargo leptos build --release
+
+      # 4. Stop the remote service
+      # Uses the specified version v1.2.2
+      - name: Stop remote service
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: 191.252.192.172
+          username: nicolassite
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: systemctl stop nicolasalmino-site
+
+      # 5. Copy built files to the server
+      # Uses the specified version v1.0.0
+      # This copies both the binary and the 'target/site' directory
+      - name: SCP files to server
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: 191.252.192.172
+          username: nicolassite
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "target/release/nicolasalmino-site,target/site"
+          target: "~/." # Deploys to the user's home directory
+          strip_components: 1 # Flattens the 'target/release' directory
+
+      # 6. Start the remote service
+      # Uses the specified version v1.2.2
+      - name: Start remote service
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: 191.252.192.172
+          username: nicolassite
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: systemctl start nicolasalmino-site
