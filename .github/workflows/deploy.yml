@@ -11,58 +11,78 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     
-    # Use the official Rust Docker image as the container for this job
-    container:
-      image: rust:latest
-
     steps:
       # 1. Check out the repository code
       - name: Check out code
         uses: actions/checkout@v5.0.0
 
-        # 2. Install wasm32-unknown-unknown target
+      # 2. Set up Rust toolchain
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # 3. Install wasm32-unknown-unknown target
       - name: Install wasm target
         run: rustup target add wasm32-unknown-unknown
 
-      # 2. Install cargo-leptos
-      # We run this as the root user (default in the container)
-      # Caching this step could speed up future builds
+      # 4. Install cargo-leptos
       - name: Install cargo-leptos
         run: cargo install cargo-leptos
 
-      # 3. Build the Leptos project in release mode
+      # 5. Build the Leptos project in release mode
       - name: Build Leptos project
         run: cargo leptos build --release
 
-      # 4. Stop the remote service
-      # Uses the specified version v1.2.2
-      - name: Stop remote service
+      # 6. Set up deployment variables
+      - name: Set up deploy variables
+        run: |
+          echo "RELEASE_DIR=${{ env.RELEASE_DIR }}/$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+          
+      # 7. Create new release directory on server
+      - name: Create remote release directory
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: 191.252.192.172
-          username: nicolassite
+          username: nicolasalmino-site-deploy
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: systemctl stop nicolasalmino-site
+          script: mkdir -p ${{ env.RELEASE_DIR }}
 
-      # 5. Copy built files to the server
-      # Uses the specified version v1.0.0
-      # This copies both the binary and the 'target/site' directory
+      # 8. Copy built files to the server
+      # This copies the binary and the frontend assets into the new release dir
       - name: SCP files to server
         uses: appleboy/scp-action@v1.0.0
         with:
           host: 191.252.192.172
-          username: nicolassite
+          username: nicolasalmino-site-deploy
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "target/release/nicolasalmino-site,target/site"
-          target: "~/." # Deploys to the user's home directory
-          strip_components: 1 # Flattens the 'target/release' directory
+          target: "${{ env.RELEASE_DIR }}"
+          strip_components: 1 # Flattens 'target/release' and 'target/site'
 
-      # 6. Start the remote service
-      # Uses the specified version v1.2.2
-      - name: Start remote service
+      # 9. Activate the new release
+      - name: Activate new release
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: 191.252.192.172
-          username: nicolassite
+          username: nicolasalmino-site-deploy
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: systemctl start nicolasalmino-site
+          script: |
+            # Make the new binary executable
+            echo "Setting permissions for new binary"
+            chmod +x ${{ env.RELEASE_DIR }}/nicolasalmino-site
+            
+            # Link the shared .env file into the new release
+            echo "Linking shared .env file"
+            ln -sfn ${{ env.APP_DIR }}/shared/.env ${{ env.RELEASE_DIR }}/.env
+            
+            # --- THE ATOMIC SWITCH ---
+            # Point the 'current' symlink to the new release directory
+            echo "Activating new release"
+            ln -sfn ${{ env.RELEASE_DIR }} ${{ env.APP_DIR }}/current
+            
+            # Restart the service (using sudo as configured)
+            echo "Restarting application service..."
+            sudo systemctl restart nicolasalmino-site.service
+            
+            # (Optional) Prune old releases, keeping the last 5
+            echo "Cleaning up old releases..."
+            cd ${{ env.APP_DIR }}/releases && ls -1tr | head -n -5 | xargs -r rm -rf
