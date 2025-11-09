@@ -49,15 +49,26 @@ jobs:
 
       # 8. Copy built files to the server
       # This copies the binary and the frontend assets into the new release dir
-      - name: SCP files to server
+      - name: Copy binary to server
         uses: appleboy/scp-action@v1.0.0
         with:
           host: 191.252.192.172
           username: nicolasalmino-site-deploy
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "target/release/nicolasalmino-site,target/site"
+          source: "target/release/nicolasalmino-site"
           target: "${{ env.RELEASE_DIR }}"
-          strip_components: 1 # Flattens 'target/release' and 'target/site'
+          strip_components: 2 # Strips 'target/release/'
+
+      # 9. Copy assets to server
+      - name: Copy assets to server
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: 191.252.192.172
+          username: nicolasalmino-site-deploy
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "target/site/." # The /_._ copies the *contents* of /site
+          target: "${{ env.RELEASE_DIR }}"
+          strip_components: 2 # Strips 'target/site/'
 
       # 9. Activate the new release
       - name: Activate new release
