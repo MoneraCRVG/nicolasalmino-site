@@ -32,10 +32,11 @@ jobs:
       - name: Build Leptos project
         run: cargo leptos build --release
 
-      # 6. Set up deployment variables
       - name: Set up deploy variables
         run: |
-          echo "RELEASE_DIR=${{ env.RELEASE_DIR }}/$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+          echo "RELEASE_DIR=/var/www/nicolasalmino-site/releases/$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+          echo "APP_DIR=/var/www/nicolasalmino-site" >> $GITHUB_ENV
+          
           
       # 7. Create new release directory on server
       - name: Create remote release directory
