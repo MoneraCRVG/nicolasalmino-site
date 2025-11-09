@@ -83,6 +83,6 @@ jobs:
             echo "Restarting application service..."
             sudo systemctl restart nicolasalmino-site.service
             
-            # (Optional) Prune old releases, keeping the last 5
+            
             echo "Cleaning up old releases..."
             cd ${{ env.APP_DIR }}/releases && ls -1tr | head -n -5 | xargs -r rm -rf
