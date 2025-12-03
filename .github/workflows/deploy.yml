@@ -8,93 +8,116 @@ on:
       - main
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
+    container: rust:latest # Use the official Rust Docker image
     
     steps:
       # 1. Check out the repository code
       - name: Check out code
-        uses: actions/checkout@v5.0.0
+        uses: actions/checkout@v4
 
-      # 2. Set up Rust toolchain
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      # 2. Set up Node.js for Tailwind CSS
+      # The rust:latest image is Debian-based, so setup-node works here
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-      # 3. Install wasm32-unknown-unknown target
+      # 3. Install NPM dependencies
+      - name: Install NPM dependencies
+        run: npm ci
+
+      # 4. Build Tailwind CSS
+      - name: Build Tailwind CSS
+        run: npm run tailwind:build
+
+      # 5. Install wasm32-unknown-unknown target
+      # rust:latest includes rustup/cargo, so we just add the target
       - name: Install wasm target
         run: rustup target add wasm32-unknown-unknown
 
-      # 4. Install cargo-leptos
+      # 6. Install cargo-leptos
       - name: Install cargo-leptos
         run: cargo install cargo-leptos
 
-      # 5. Build the Leptos project in release mode
+      # 7. Build the Leptos project in release mode
       - name: Build Leptos project
         run: cargo leptos build --release
+
+      # 8. Upload artifacts for the deploy job
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-artifacts
+          path: |
+            target/release/nicolasalmino-site
+            target/site/
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build # Wait for build to finish
+    
+    steps:
+      # 1. Download artifacts from the build job
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-artifacts
+          # Downloads to current directory, preserving structure (e.g., ./target/release/...)
 
       - name: Set up deploy variables
         run: |
           echo "RELEASE_DIR=/var/www/nicolasalmino-site/releases/$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
           echo "APP_DIR=/var/www/nicolasalmino-site" >> $GITHUB_ENV
-          
-          
-      # 7. Create new release directory on server
-      - name: Create remote release directory
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: 191.252.192.172
-          username: nicolasalmino-site-deploy
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: mkdir -p ${{ env.RELEASE_DIR }}
 
-      # 8. Copy built files to the server
-      # This copies the binary and the frontend assets into the new release dir
-      - name: Copy binary to server
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: 191.252.192.172
-          username: nicolasalmino-site-deploy
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "target/release/nicolasalmino-site"
-          target: "${{ env.RELEASE_DIR }}"
-          strip_components: 2 # Strips 'target/release/'
+      # 2. Configure SSH
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H 191.252.192.172 >> ~/.ssh/known_hosts
 
-      # 9. Copy assets to server
-      - name: Copy assets to server
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: 191.252.192.172
-          username: nicolasalmino-site-deploy
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "target/site/." # The /_._ copies the *contents* of /site
-          target: "${{ env.RELEASE_DIR }}"
-          strip_components: 2 # Strips 'target/site/'
+      # 3. Deploy via Native SSH/SCP
+      - name: Deploy to Server
+        run: |
+          # Prepare assets archive to ensure clean transfer
+          echo "Archiving assets..."
+          tar -czf assets.tar.gz -C target/site .
 
-      # 9. Activate the new release
-      - name: Activate new release
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: 191.252.192.172
-          username: nicolasalmino-site-deploy
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            # Make the new binary executable
-            echo "Setting permissions for new binary"
+          # Create remote directory
+          echo "Creating remote directory..."
+          ssh -i ~/.ssh/id_rsa nicolasalmino-site-deploy@191.252.192.172 "mkdir -p ${{ env.RELEASE_DIR }}"
+
+          # Upload Binary
+          echo "Uploading binary..."
+          scp -i ~/.ssh/id_rsa target/release/nicolasalmino-site nicolasalmino-site-deploy@191.252.192.172:${{ env.RELEASE_DIR }}/
+
+          # Upload Assets Archive
+          echo "Uploading assets..."
+          scp -i ~/.ssh/id_rsa assets.tar.gz nicolasalmino-site-deploy@191.252.192.172:${{ env.RELEASE_DIR }}/
+
+          # Activate Release
+          echo "Activating release..."
+          ssh -i ~/.ssh/id_rsa nicolasalmino-site-deploy@191.252.192.172 << 'EOF'
+            # 1. Extract assets
+            tar -xzf ${{ env.RELEASE_DIR }}/assets.tar.gz -C ${{ env.RELEASE_DIR }}/
+            rm ${{ env.RELEASE_DIR }}/assets.tar.gz
+
+            # 2. Make binary executable
             chmod +x ${{ env.RELEASE_DIR }}/nicolasalmino-site
             
-            # Link the shared .env file into the new release
-            echo "Linking shared .env file"
+            # 3. Link shared .env
             ln -sfn ${{ env.APP_DIR }}/shared/.env ${{ env.RELEASE_DIR }}/.env
             
-            # --- THE ATOMIC SWITCH ---
-            # Point the 'current' symlink to the new release directory
-            echo "Activating new release"
+            # 4. Atomic Switch
             ln -sfn ${{ env.RELEASE_DIR }} ${{ env.APP_DIR }}/current
             
-            # Restart the service (using sudo as configured)
-            echo "Restarting application service..."
+            # 5. Restart Service
             sudo systemctl restart nicolasalmino-site.service
             
-            
-            echo "Cleaning up old releases..."
+            # 6. Cleanup old releases (keep last 5)
             cd ${{ env.APP_DIR }}/releases && ls -1tr | head -n -5 | xargs -r rm -rf
+          EOF

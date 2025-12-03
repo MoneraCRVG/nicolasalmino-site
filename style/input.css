@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    background-color: #0a0a0a;
+    font-family: 'Science Gothic', sans-serif;
+    overflow-x: hidden;
+}
+
+/* Garante suavidade no scroll */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom Utilities */
+@layer utilities {
+    .text-shadow {
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* Advanced Hover Animations 
+   Hardware accelerated transitions for smooth 60fps+ performance
+*/
+@layer components {
+    /* Sleek Underline Animation */
+    .hover-underline {
+        @apply relative inline-block text-current no-underline;
+    }
+
+    .hover-underline::after {
+        content: '';
+        @apply absolute w-full h-[2px] bottom-0 left-0 bg-blue-500 origin-bottom-right transition-transform duration-300 ease-out scale-x-0;
+    }
+
+    .hover-underline:hover::after {
+        @apply origin-bottom-left scale-x-100;
+    }
+
+    /* Grid Spotlight Specifics */
+    .bg-grid-pattern {
+        background-image: 
+            linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+        background-size: 50px 50px;
+    }
+}

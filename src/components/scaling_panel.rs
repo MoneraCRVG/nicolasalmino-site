@@ -1,14 +1,15 @@
-use leptos::tachys::dom::window;
 use leptos::*;
 use leptos::prelude::*;
-    use leptos_use::*;
+
 #[component]
 pub fn ScalingPanel(
     children: Children,
 ) -> impl IntoView {
     let scale = RwSignal::new(1.0_f32);
     
+    // Removed unused import for leptos_use
     let scroll_y = use_context::<RwSignal<f32>>().expect("Should be inside StackingContainer");
+    
     // Create effect that updates scale based on scroll position
     Effect::new(move |_| {
         let current_scroll = scroll_y.get();

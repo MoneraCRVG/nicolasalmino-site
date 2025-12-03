@@ -15,8 +15,14 @@ leptos = { version = "0.8.12" }
 leptos_meta = { version = "0.8.5" }
 leptos_actix = { version = "0.8.6", optional = true }
 leptos_router = { version = "0.8.9" }
-wasm-bindgen = "0.2.105"
+# FIX: Pin wasm-bindgen to exactly 0.2.105 to match cargo-leptos CLI
+wasm-bindgen = "=0.2.105"
 leptos-use = "0.16.3"
+
+# FIX: Pin web-sys to 0.3.82 which is compatible with wasm-bindgen 0.2.105
+[dependencies.web-sys]
+version = "=0.3.82"
+features = ["MouseEvent"]
 
 [features]
 csr = ["leptos/csr"]
@@ -28,6 +34,7 @@ ssr = [
   "leptos/ssr",
   "leptos_meta/ssr",
   "leptos_router/ssr",
+  "leptos-use/ssr"
 ]
 [profile.release]
 opt-level = 3
@@ -50,7 +57,7 @@ site-root = "target/site"
 # Defaults to pkg
 site-pkg-dir = "pkg"
 # [Optional] The source CSS file. If it ends with .sass or .scss then it will be compiled by dart-sass into CSS. The CSS is optimized by Lightning CSS before being written to <site-root>/<site-pkg>/app.css
-style-file = "style/main.scss"
+style-file = "style/main.css"
 # Assets source dir. All files found here will be copied and synchronized to site-root.
 # The assets-dir cannot have a sub directory with the same name/path as site-pkg-dir.
 #

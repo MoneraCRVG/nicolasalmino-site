@@ -1,0 +1,12 @@
+{
+  "name": "nicolasalmino-site",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "tailwind:watch": "npx tailwindcss -i ./style/input.css -o ./style/main.css --watch",
+    "tailwind:build": "npx tailwindcss -i ./style/input.css -o ./style/main.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1"
+  }
+}
