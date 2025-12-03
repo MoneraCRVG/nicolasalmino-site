@@ -83,17 +83,35 @@ jobs:
       # 3. Deploy via Native SSH/SCP
       - name: Deploy to Server
         run: |
+          # Debug: List files to confirm structure (Helps diagnose 'No such file' errors)
+          echo "Listing downloaded artifact structure:"
+          ls -R
+
+          # Path Detection: Handle flattened artifacts (target/ might be stripped)
+          if [ -d "target/site" ]; then
+            echo "Structure preserved: target/site found"
+            SITE_DIR="target/site"
+            BIN_PATH="target/release/nicolasalmino-site"
+          elif [ -d "site" ]; then
+            echo "Structure flattened: site/ found"
+            SITE_DIR="site"
+            BIN_PATH="release/nicolasalmino-site"
+          else
+            echo "Error: Could not find 'site' assets directory. Check 'ls -R' output above."
+            exit 1
+          fi
+
           # Prepare assets archive to ensure clean transfer
-          echo "Archiving assets..."
-          tar -czf assets.tar.gz -C target/site .
+          echo "Archiving assets from $SITE_DIR..."
+          tar -czf assets.tar.gz -C "$SITE_DIR" .
 
           # Create remote directory
           echo "Creating remote directory..."
           ssh -i ~/.ssh/id_rsa nicolasalmino-site-deploy@191.252.192.172 "mkdir -p ${{ env.RELEASE_DIR }}"
 
           # Upload Binary
-          echo "Uploading binary..."
-          scp -i ~/.ssh/id_rsa target/release/nicolasalmino-site nicolasalmino-site-deploy@191.252.192.172:${{ env.RELEASE_DIR }}/
+          echo "Uploading binary from $BIN_PATH..."
+          scp -i ~/.ssh/id_rsa "$BIN_PATH" nicolasalmino-site-deploy@191.252.192.172:${{ env.RELEASE_DIR }}/
 
           # Upload Assets Archive
           echo "Uploading assets..."
